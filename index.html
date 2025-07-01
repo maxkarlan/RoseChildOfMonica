@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blooming Rose - p5.js</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .title {
+            position: absolute;
+            top: 20px;
+            color: white;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Blooming Rose</div>
+    <script>
+        let rose;
+        let time = 0;
+        let bloomProgress = 0;
+        let bloomDirection = 1; // 1 for blooming, -1 for shrinking
+        let bloomSpeed = 0.008; // Slower for more dramatic bloom
+
+        class Rose {
+            constructor() {
+                this.petals = [];
+                this.centerX = width / 2;
+                this.centerY = height / 2;
+                this.numPetals = 40; // More petals for fuller bloom
+                this.createPetals();
+            }
+
+            createPetals() {
+                // Create multiple layers of petals with different characteristics
+                let petalIndex = 0;
+                
+                // Inner bud layer - very small, tightly packed
+                for (let i = 0; i < 6; i++) {
+                    let angle = (i / 6) * TWO_PI + random(-0.1, 0.1);
+                    this.petals.push(new Petal(
+                        this.centerX,
+                        this.centerY,
+                        angle,
+                        8 + random(-2, 2),
+                        15 + random(-3, 3),
+                        0, // bud layer
+                        petalIndex++,
+                        true // isBud
+                    ));
+                }
+                
+                // Inner layer - small, tightly packed
+                for (let i = 0; i < 10; i++) {
+                    let angle = (i / 10) * TWO_PI + random(-0.2, 0.2);
+                    this.petals.push(new Petal(
+                        this.centerX,
+                        this.centerY,
+                        angle,
+                        20 + random(-3, 3),
+                        35 + random(-5, 5),
+                        1, // inner layer
+                        petalIndex++,
+                        false
+                    ));
+                }
+                
+                // Middle layers - medium size, more spread
+                for (let layer = 2; layer <= 4; layer++) {
+                    let petalsInLayer = 8 + layer * 2;
+                    for (let i = 0; i < petalsInLayer; i++) {
+                        let angle = (i / petalsInLayer) * TWO_PI + random(-0.3, 0.3);
+                        let layerOffset = layer * 0.1;
+                        this.petals.push(new Petal(
+                            this.centerX,
+                            this.centerY,
+                            angle + layerOffset,
+                            30 + layer * 8 + random(-8, 8),
+                            50 + layer * 12 + random(-10, 10),
+                            layer,
+                            petalIndex++,
+                            false
+                        ));
+                    }
+                }
+                
+                // Outer layers - large, dramatic petals
+                for (let layer = 5; layer <= 6; layer++) {
+                    let petalsInLayer = 6;
+                    for (let i = 0; i < petalsInLayer; i++) {
+                        let angle = (i / petalsInLayer) * TWO_PI + random(-0.4, 0.4);
+                        let layerOffset = layer * 0.15;
+                        this.petals.push(new Petal(
+                            this.centerX,
+                            this.centerY,
+                            angle + layerOffset,
+                            60 + layer * 12 + random(-10, 10),
+                            90 + layer * 15 + random(-15, 15),
+                            layer,
+                            petalIndex++,
+                            false
+                        ));
+                    }
+                }
+            }
+
+            update() {
+                // Continuous blooming and shrinking cycle
+                bloomProgress += bloomDirection * bloomSpeed;
+                
+                // Reverse direction at boundaries
+                if (bloomProgress >= 1) {
+                    bloomProgress = 1;
+                    bloomDirection = -1; // Start shrinking
+                } else if (bloomProgress <= 0) {
+                    bloomProgress = 0;
+                    bloomDirection = 1; // Start blooming
+                }
+
+                // Update all petals
+                for (let petal of this.petals) {
+                    petal.update(bloomProgress);
+                }
+            }
+
+            display() {
+                // Draw stem with more realistic appearance
+                this.drawStem();
+                
+                // Draw leaves
+                this.drawLeaves();
+                
+                // Draw petals in reverse order (back to front)
+                for (let i = this.petals.length - 1; i >= 0; i--) {
+                    this.petals[i].display();
+                }
+                
+                // Draw center
+                this.drawCenter();
+            }
+
+            drawStem() {
+                // Main stem with gradient and texture
+                strokeWeight(12);
+                for (let i = 0; i < 150; i++) {
+                    let y = this.centerY + 100 + i;
+                    let alpha = map(i, 0, 150, 255, 200);
+                    let greenValue = map(i, 0, 150, 34, 25);
+                    stroke(25, greenValue, 15, alpha);
+                    line(this.centerX, y, this.centerX, y + 1);
+                }
+                
+                // Add stem texture with subtle lines
+                stroke(20, 80, 20, 60);
+                strokeWeight(1);
+                for (let i = 0; i < 10; i++) {
+                    let y = this.centerY + 110 + i * 15;
+                    line(this.centerX - 3, y, this.centerX + 3, y);
+                }
+                
+                // Add thorns
+                this.drawThorns();
+                
+                // Draw the stem tip that connects to the rose
+                this.drawStemTip();
+            }
+
+            drawStemTip() {
+                // Thinner, sharper stem tip that connects to the rose
+                stroke(25, 100, 25);
+                strokeWeight(6);
+                line(this.centerX, this.centerY + 100, this.centerY + 85);
+                
+                strokeWeight(4);
+                line(this.centerX, this.centerY + 85, this.centerY + 75);
+                
+                strokeWeight(2);
+                line(this.centerX, this.centerY + 75, this.centerY + 70);
+                
+                // Add a small connecting point
+                fill(25, 100, 25);
+                noStroke();
+                ellipse(this.centerX, this.centerY + 70, 4, 4);
+            }
+
+            drawThorns() {
+                fill(40, 100, 40);
+                noStroke();
+                for (let i = 0; i < 6; i++) {
+                    let y = this.centerY + 120 + i * 20;
+                    let x = this.centerX + (i % 2 === 0 ? 8 : -8);
+                    push();
+                    translate(x, y);
+                    rotate(i % 2 === 0 ? PI/6 : -PI/6);
+                    triangle(-2, -8, 2, -8, 0, 0);
+                    pop();
+                }
+            }
+
+            drawLeaves() {
+                // Left leaf - more elongated
+                push();
+                translate(this.centerX - 30, this.centerY + 190);
+                rotate(-PI/6);
+                this.drawLeaf(60, 20, 1);
+                pop();
+                
+                // Right leaf - more elongated
+                push();
+                translate(this.centerX + 30, this.centerY + 210);
+                rotate(PI/6);
+                this.drawLeaf(55, 18, -1);
+                pop();
+                
+                // Small leaf near top - elongated
+                push();
+                translate(this.centerX - 20, this.centerY + 150);
+                rotate(-PI/8);
+                this.drawLeaf(40, 12, 1);
+                pop();
+                
+                // Additional small leaf - elongated
+                push();
+                translate(this.centerX + 25, this.centerY + 170);
+                rotate(PI/10);
+                this.drawLeaf(35, 10, -1);
+                pop();
+            }
+
+            drawLeaf(width, height, side) {
+                // Main leaf shape with more elongated, organic curves
+                fill(34, 139, 34);
+                noStroke();
+                
+                beginShape();
+                vertex(0, -height/2);
+                bezierVertex(width/5, -height/2, width/2, -height/2.2, width/2, -height/3);
+                bezierVertex(width/2, -height/4, width/2.2, -height/6, width/2, 0);
+                bezierVertex(width/2, height/6, width/2.2, height/4, width/2, height/3);
+                bezierVertex(width/2, height/2.2, width/5, height/2, 0, height/2);
+                bezierVertex(-width/5, height/2, -width/2, height/2.2, -width/2, height/3);
+                bezierVertex(-width/2, height/4, -width/2.2, height/6, -width/2, 0);
+                bezierVertex(-width/2, -height/6, -width/2.2, -height/4, -width/2, -height/3);
+                bezierVertex(-width/2, -height/2.2, -width/5, -height/2, 0, -height/2);
+                endShape();
+                
+                // Leaf veins with more detail
+                stroke(25, 100, 25, 120);
+                strokeWeight(1.5);
+                // Main vein
+                line(0, -height/2, 0, height/2);
+                
+                // Side veins
+                for (let i = 1; i <= 5; i++) {
+                    let offset = i * width * 0.12 * side;
+                    let veinLength = height * 0.25;
+                    line(offset, -height/3, offset + width * 0.08 * side, -height/3 + veinLength);
+                    line(offset, height/3, offset + width * 0.08 * side, height/3 - veinLength);
+                }
+                
+                // Add leaf texture
+                stroke(25, 100, 25, 40);
+                strokeWeight(0.5);
+                for (let i = 0; i < 8; i++) {
+                    let y = -height/2 + i * height/8;
+                    let curveWidth = width * 0.25 * (1 - abs(y) / height);
+                    line(-curveWidth, y, curveWidth, y);
+                }
+            }
+
+            drawCenter() {
+                // Draw the center of the rose with more detail and femininity
+                // Outer center
+                fill(139, 69, 19);
+                noStroke();
+                ellipse(this.centerX, this.centerY, 30, 30);
+                
+                // Middle ring
+                fill(160, 82, 45);
+                ellipse(this.centerX, this.centerY, 20, 20);
+                
+                // Inner center with stamen-like details
+                fill(120, 60, 30);
+                ellipse(this.centerX, this.centerY, 12, 12);
+                
+                // Add delicate stamen details
+                fill(200, 180, 120);
+                for (let i = 0; i < 16; i++) {
+                    let angle = (i / 16) * TWO_PI;
+                    let x = this.centerX + cos(angle) * 8;
+                    let y = this.centerY + sin(angle) * 8;
+                    ellipse(x, y, 2, 2);
+                }
+                
+                // Center highlight
+                fill(255, 240, 200, 100);
+                ellipse(this.centerX - 2, this.centerY - 2, 6, 6);
+            }
+        }
+
+        class Petal {
+            constructor(x, y, angle, size, length, layer, index, isBud) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.size = size;
+                this.length = length;
+                this.layer = layer;
+                this.index = index;
+                this.isBud = isBud;
+                this.originalAngle = angle;
+                this.originalSize = size;
+                this.originalLength = length;
+                this.offset = random(TWO_PI);
+                this.curl = random(-0.3, 0.3);
+            }
+
+            update(bloomProgress) {
+                // Calculate petal opening based on bloom progress
+                let openAngle = map(bloomProgress, 0, 1, 0, PI/2.5);
+                this.angle = this.originalAngle + sin(this.offset + time * 0.3) * 0.05;
+                
+                // Petals open outward based on their layer
+                let layerFactor = this.layer * 0.4;
+                this.angle += openAngle * layerFactor;
+                
+                // Size and length change with bloom - dramatic transformation from bud to full bloom
+                let sizeMultiplier, lengthMultiplier;
+                
+                if (this.isBud) {
+                    // Bud petals start very small and grow dramatically
+                    sizeMultiplier = 0.1 + bloomProgress * 0.9;
+                    lengthMultiplier = 0.05 + bloomProgress * 0.95;
+                } else {
+                    // Regular petals have more moderate growth
+                    sizeMultiplier = 0.2 + bloomProgress * 0.8;
+                    lengthMultiplier = 0.1 + bloomProgress * 0.9;
+                }
+                
+                this.size = this.originalSize * sizeMultiplier;
+                this.length = this.originalLength * lengthMultiplier;
+            }
+
+            display() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.angle);
+                
+                // Create more delicate, feminine rose petal colors
+                let baseRed = map(this.layer, 0, 5, 240, 200);
+                let baseGreen = map(this.layer, 0, 5, 30, 60);
+                let baseBlue = map(this.layer, 0, 5, 80, 120);
+                
+                // Add softer variation for more natural look
+                let petalColor = color(
+                    baseRed + random(-25, 25),
+                    baseGreen + random(-8, 12),
+                    baseBlue + random(-15, 20)
+                );
+                
+                // Create softer gradient effect
+                let petalColorLight = color(
+                    red(petalColor) + 30,
+                    green(petalColor) + 15,
+                    blue(petalColor) + 20
+                );
+                
+                let petalColorDark = color(
+                    red(petalColor) - 20,
+                    green(petalColor) - 10,
+                    blue(petalColor) - 15
+                );
+                
+                // Draw main petal shape with more realistic curves
+                this.drawPetalShape(petalColor, petalColorLight, petalColorDark);
+                
+                // Add petal veins
+                this.drawVeins();
+                
+                // Add petal texture
+                this.drawTexture();
+                
+                pop();
+            }
+
+            drawPetalShape(mainColor, lightColor, darkColor) {
+                // Create more realistic petal shape with better curves
+                let petalWidth = this.size;
+                let petalHeight = this.length;
+                
+                // Main petal body with shadow
+                fill(darkColor);
+                noStroke();
+                this.drawPetalCurve(petalWidth * 1.05, petalHeight * 1.05, 2);
+                
+                // Main petal body
+                fill(mainColor);
+                this.drawPetalCurve(petalWidth, petalHeight, 0);
+                
+                // Add highlight for depth and femininity
+                fill(lightColor);
+                this.drawPetalHighlight(petalWidth, petalHeight);
+                
+                // Add edge highlights for delicacy
+                this.drawEdgeHighlights(petalWidth, petalHeight, lightColor);
+            }
+
+            drawPetalCurve(width, height, offset) {
+                beginShape();
+                // Top point
+                vertex(0, -height + offset);
+                
+                // Right side curve - more dramatic and feminine
+                bezierVertex(
+                    width * 0.25, -height * 0.85 + offset,
+                    width * 0.6, -height * 0.7 + offset,
+                    width * 0.85, -height * 0.4 + offset
+                );
+                
+                // Right bottom curve
+                bezierVertex(
+                    width * 0.95, -height * 0.15 + offset,
+                    width * 0.85, height * 0.1 + offset,
+                    width * 0.7, height * 0.3 + offset
+                );
+                
+                // Bottom curve
+                bezierVertex(
+                    width * 0.5, height * 0.5 + offset,
+                    width * 0.3, height * 0.65 + offset,
+                    0, height * 0.75 + offset
+                );
+                
+                // Left bottom curve
+                bezierVertex(
+                    -width * 0.3, height * 0.65 + offset,
+                    -width * 0.5, height * 0.5 + offset,
+                    -width * 0.7, height * 0.3 + offset
+                );
+                
+                // Left side curve
+                bezierVertex(
+                    -width * 0.85, height * 0.1 + offset,
+                    -width * 0.95, -height * 0.15 + offset,
+                    -width * 0.85, -height * 0.4 + offset
+                );
+                
+                // Left top curve
+                bezierVertex(
+                    -width * 0.6, -height * 0.7 + offset,
+                    -width * 0.25, -height * 0.85 + offset,
+                    0, -height + offset
+                );
+                endShape();
+            }
+
+            drawPetalHighlight(width, height) {
+                beginShape();
+                vertex(0, -height * 0.8);
+                bezierVertex(
+                    width * 0.15, -height * 0.7,
+                    width * 0.3, -height * 0.5,
+                    width * 0.4, -height * 0.3
+                );
+                bezierVertex(
+                    width * 0.35, -height * 0.1,
+                    width * 0.25, height * 0.1,
+                    0, height * 0.3
+                );
+                bezierVertex(
+                    -width * 0.25, height * 0.1,
+                    -width * 0.35, -height * 0.1,
+                    -width * 0.4, -height * 0.3
+                );
+                bezierVertex(
+                    -width * 0.3, -height * 0.5,
+                    -width * 0.15, -height * 0.7,
+                    0, -height * 0.8
+                );
+                endShape();
+            }
+
+            drawEdgeHighlights(width, height, lightColor) {
+                // Add delicate edge highlights
+                fill(lightColor);
+                noStroke();
+                
+                // Top edge highlight
+                ellipse(0, -height * 0.9, width * 0.3, height * 0.1);
+                
+                // Side edge highlights
+                ellipse(width * 0.8, -height * 0.3, width * 0.15, height * 0.2);
+                ellipse(-width * 0.8, -height * 0.3, width * 0.15, height * 0.2);
+            }
+
+            drawVeins() {
+                // Draw multiple veins for more realistic appearance
+                stroke(200, 120, 140, 60);
+                strokeWeight(1);
+                
+                // Main vein
+                line(0, -this.length * 0.8, 0, this.length * 0.6);
+                
+                // Side veins with more delicate appearance
+                for (let i = 1; i <= 4; i++) {
+                    let offset = i * this.size * 0.12;
+                    let veinLength = this.length * 0.4;
+                    // Right vein
+                    line(offset, -this.length * 0.6, offset + this.size * 0.08, this.length * 0.3);
+                    // Left vein
+                    line(-offset, -this.length * 0.6, -offset - this.size * 0.08, this.length * 0.3);
+                }
+                
+                // Add subtle secondary veins
+                stroke(200, 120, 140, 30);
+                strokeWeight(0.5);
+                for (let i = 1; i <= 6; i++) {
+                    let offset = i * this.size * 0.08;
+                    let veinLength = this.length * 0.25;
+                    line(offset, -this.length * 0.4, offset + this.size * 0.05, this.length * 0.2);
+                    line(-offset, -this.length * 0.4, -offset - this.size * 0.05, this.length * 0.2);
+                }
+            }
+
+            drawTexture() {
+                // Add delicate petal texture
+                stroke(255, 255, 255, 20);
+                strokeWeight(0.5);
+                
+                // Subtle texture lines
+                for (let i = 0; i < 8; i++) {
+                    let y = -this.length * 0.7 + i * this.length * 0.2;
+                    let lineWidth = this.size * 0.4 * (1 - abs(y) / this.length);
+                    line(-lineWidth, y, lineWidth, y);
+                }
+                
+                // Add some sparkle highlights
+                fill(255, 255, 255, 30);
+                noStroke();
+                for (let i = 0; i < 3; i++) {
+                    let x = random(-this.size * 0.3, this.size * 0.3);
+                    let y = random(-this.length * 0.5, this.length * 0.3);
+                    ellipse(x, y, 1, 1);
+                }
+            }
+        }
+
+        function setup() {
+            createCanvas(800, 600);
+            rose = new Rose();
+        }
+
+        function draw() {
+            // Create gradient background
+            for (let i = 0; i <= height; i++) {
+                let inter = map(i, 0, height, 0, 1);
+                let c = lerpColor(color(102, 126, 234), color(118, 75, 162), inter);
+                stroke(c);
+                line(0, i, width, i);
+            }
+            
+            time += 0.015;
+            rose.update();
+            rose.display();
+            
+            // Add some floating particles for atmosphere
+            drawParticles();
+        }
+
+        function drawParticles() {
+            for (let i = 0; i < 15; i++) {
+                let x = noise(i * 100 + time) * width;
+                let y = noise(i * 200 + time) * height;
+                let size = noise(i * 300 + time) * 2;
+                
+                fill(255, 255, 255, 40);
+                noStroke();
+                ellipse(x, y, size, size);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(800, 600);
+            rose = new Rose();
+        }
+    </script>
+</body>
+</html> 
